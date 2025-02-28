@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS base_langs (
     FOREIGN KEY (word_id) REFERENCES words(id) ON DELETE CASCADE
 );
 
--- References (animation, compare, phonetic, see)
-CREATE TABLE IF NOT EXISTS references (
+-- word_references (animation, compare, phonetic, see)
+CREATE TABLE IF NOT EXISTS word_references (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     base_lang_id INTEGER NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('animation', 'compare', 'phonetic', 'see')),
@@ -306,19 +306,19 @@ func (d *DB) Close() error {
 func createSchema(db *sql.DB) error {
 	// Split statements by semicolon
 	statements := strings.Split(schema, ";")
-	
+
 	for _, statement := range statements {
 		statement = strings.TrimSpace(statement)
 		if statement == "" {
 			continue
 		}
-		
+
 		_, err := db.Exec(statement)
 		if err != nil {
 			return fmt.Errorf("failed to execute schema statement: %w\nStatement: %s", err, statement)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -333,7 +333,7 @@ func (d *DB) RunInTransaction(ctx context.Context, fn func(*sql.Tx) error) error
 	if err != nil {
 		return err
 	}
-	
+
 	if err := fn(tx); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
 			log.Printf("Transaction failed: %v, rollback failed: %v", err, rbErr)
@@ -341,7 +341,7 @@ func (d *DB) RunInTransaction(ctx context.Context, fn func(*sql.Tx) error) error
 		}
 		return err
 	}
-	
+
 	return tx.Commit()
 }
 
@@ -349,18 +349,18 @@ func (d *DB) RunInTransaction(ctx context.Context, fn func(*sql.Tx) error) error
 func (d *DB) GetDictionaryByLanguages(ctx context.Context, baseLang, targetLang string) (int64, string, string, string, error) {
 	var id int64
 	var base, target, version string
-	
+
 	err := d.db.QueryRowContext(ctx, `
 		SELECT id, base_lang, target_lang, version 
 		FROM dictionaries 
 		WHERE base_lang = ? AND target_lang = ?
 		LIMIT 1
 	`, baseLang, targetLang).Scan(&id, &base, &target, &version)
-	
+
 	if err != nil {
 		return 0, "", "", "", err
 	}
-	
+
 	return id, base, target, version, nil
 }
 
@@ -370,25 +370,25 @@ func (d *DB) CreateDictionary(ctx context.Context, baseLang, targetLang, version
 		INSERT INTO dictionaries (base_lang, target_lang, version)
 		VALUES (?, ?, ?)
 	`, baseLang, targetLang, version)
-	
+
 	if err != nil {
 		return 0, err
 	}
-	
+
 	return result.LastInsertId()
 }
 
 // CountDictionaryEntries counts the entries in a dictionary
 func (d *DB) CountDictionaryEntries(ctx context.Context, dictionaryID int64) (int64, error) {
 	var count int64
-	
+
 	err := d.db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM words WHERE dictionary_id = ?
 	`, dictionaryID).Scan(&count)
-	
+
 	if err != nil {
 		return 0, err
 	}
-	
+
 	return count, nil
 }

@@ -45,7 +45,7 @@ func (r *Repository) StoreDictionary(ctx context.Context, dict *parser.Dictionar
 			if i > 0 && i%1000 == 0 {
 				log.Printf("Processed %d words...", i)
 			}
-			
+
 			if err := storeWord(tx, dictID, word); err != nil {
 				return fmt.Errorf("failed to store word %s: %w", word.Value, err)
 			}
@@ -66,7 +66,7 @@ func storeWord(tx *sql.Tx, dictionaryID int64, word parser.Word) error {
 		return err
 	}
 	defer wordStmt.Close()
-	
+
 	wordResult, err := wordStmt.Exec(
 		dictionaryID,
 		word.Value,
@@ -79,26 +79,26 @@ func storeWord(tx *sql.Tx, dictionaryID int64, word parser.Word) error {
 	if err != nil {
 		return err
 	}
-	
+
 	wordID, err := wordResult.LastInsertId()
 	if err != nil {
 		return err
 	}
-	
+
 	// Process base language entries
 	for _, baseLang := range word.BaseLangs {
 		if err := storeBaseLang(tx, wordID, baseLang); err != nil {
 			return fmt.Errorf("failed to store base language: %w", err)
 		}
 	}
-	
+
 	// Process target language entries
 	for _, targetLang := range word.TargetLang {
 		if err := storeTargetLang(tx, wordID, targetLang); err != nil {
 			return fmt.Errorf("failed to store target language: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -113,7 +113,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 		return err
 	}
 	defer baseLangStmt.Close()
-	
+
 	baseLangResult, err := baseLangStmt.Exec(
 		wordID,
 		nullString(baseLang.Meaning.Content),
@@ -122,23 +122,23 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 	if err != nil {
 		return err
 	}
-	
+
 	baseLangID, err := baseLangResult.LastInsertId()
 	if err != nil {
 		return err
 	}
-	
-	// Store references
+
+	// Store word_references
 	if len(baseLang.References) > 0 {
 		refStmt, err := tx.Prepare(`
-			INSERT INTO references (base_lang_id, type, value, matching_id)
+			INSERT INTO word_references (base_lang_id, type, value, matching_id)
 			VALUES (?, ?, ?, ?)
 		`)
 		if err != nil {
 			return err
 		}
 		defer refStmt.Close()
-		
+
 		for _, ref := range baseLang.References {
 			_, err = refStmt.Exec(
 				baseLangID,
@@ -151,7 +151,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store comments
 	if len(baseLang.Comments) > 0 {
 		commentStmt, err := tx.Prepare(`
@@ -162,7 +162,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer commentStmt.Close()
-		
+
 		for _, comment := range baseLang.Comments {
 			_, err = commentStmt.Exec(
 				baseLangID,
@@ -174,7 +174,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store explanations
 	if len(baseLang.Explanations) > 0 {
 		explStmt, err := tx.Prepare(`
@@ -185,7 +185,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer explStmt.Close()
-		
+
 		for _, expl := range baseLang.Explanations {
 			_, err = explStmt.Exec(
 				baseLangID,
@@ -197,7 +197,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store alternates
 	if len(baseLang.Alternates) > 0 {
 		altStmt, err := tx.Prepare(`
@@ -208,7 +208,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer altStmt.Close()
-		
+
 		for _, alt := range baseLang.Alternates {
 			_, err = altStmt.Exec(
 				baseLangID,
@@ -219,7 +219,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store antonyms
 	if len(baseLang.Antonyms) > 0 {
 		antStmt, err := tx.Prepare(`
@@ -230,7 +230,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer antStmt.Close()
-		
+
 		for _, ant := range baseLang.Antonyms {
 			_, err = antStmt.Exec(
 				baseLangID,
@@ -241,7 +241,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store usages
 	if len(baseLang.Usages) > 0 {
 		usageStmt, err := tx.Prepare(`
@@ -252,7 +252,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer usageStmt.Close()
-		
+
 		for _, usage := range baseLang.Usages {
 			_, err = usageStmt.Exec(
 				baseLangID,
@@ -264,7 +264,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store phonetic
 	if baseLang.Phonetic.Content != "" || baseLang.Phonetic.File != "" {
 		_, err = tx.Exec(`
@@ -279,7 +279,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 	}
-	
+
 	// Store illustrations
 	if len(baseLang.Illustrations) > 0 {
 		illStmt, err := tx.Prepare(`
@@ -290,7 +290,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer illStmt.Close()
-		
+
 		for _, ill := range baseLang.Illustrations {
 			_, err = illStmt.Exec(
 				baseLangID,
@@ -303,7 +303,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store inflections
 	if len(baseLang.Inflections) > 0 {
 		inflStmt, err := tx.Prepare(`
@@ -314,7 +314,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer inflStmt.Close()
-		
+
 		variantStmt, err := tx.Prepare(`
 			INSERT INTO inflection_variants (inflection_id, content, description)
 			VALUES (?, ?, ?)
@@ -323,7 +323,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer variantStmt.Close()
-		
+
 		for _, infl := range baseLang.Inflections {
 			inflResult, err := inflStmt.Exec(
 				baseLangID,
@@ -332,12 +332,12 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			if err != nil {
 				return err
 			}
-			
+
 			inflID, err := inflResult.LastInsertId()
 			if err != nil {
 				return err
 			}
-			
+
 			// Store variants
 			for _, variant := range infl.Variants {
 				_, err = variantStmt.Exec(
@@ -351,7 +351,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store grammar info
 	if baseLang.Graminfo != "" {
 		_, err = tx.Exec(`
@@ -365,7 +365,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 	}
-	
+
 	// Store examples
 	if len(baseLang.Examples) > 0 {
 		exampleStmt, err := tx.Prepare(`
@@ -376,7 +376,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer exampleStmt.Close()
-		
+
 		for _, example := range baseLang.Examples {
 			_, err = exampleStmt.Exec(
 				baseLangID,
@@ -389,7 +389,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store idioms
 	if len(baseLang.Idioms) > 0 {
 		idiomStmt, err := tx.Prepare(`
@@ -400,7 +400,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer idiomStmt.Close()
-		
+
 		for _, idiom := range baseLang.Idioms {
 			_, err = idiomStmt.Exec(
 				baseLangID,
@@ -413,7 +413,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store compounds
 	if len(baseLang.Compounds) > 0 {
 		compoundStmt, err := tx.Prepare(`
@@ -424,7 +424,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer compoundStmt.Close()
-		
+
 		inflStmt, err := tx.Prepare(`
 			INSERT INTO compound_inflections (compound_id, content)
 			VALUES (?, ?)
@@ -433,7 +433,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer inflStmt.Close()
-		
+
 		for _, compound := range baseLang.Compounds {
 			compoundResult, err := compoundStmt.Exec(
 				baseLangID,
@@ -445,13 +445,13 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			if err != nil {
 				return err
 			}
-			
+
 			if compound.Inflection != "" {
 				compoundID, err := compoundResult.LastInsertId()
 				if err != nil {
 					return err
 				}
-				
+
 				_, err = inflStmt.Exec(
 					compoundID,
 					compound.Inflection,
@@ -462,7 +462,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store derivations
 	if len(baseLang.Derivations) > 0 {
 		derivationStmt, err := tx.Prepare(`
@@ -473,7 +473,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer derivationStmt.Close()
-		
+
 		inflStmt, err := tx.Prepare(`
 			INSERT INTO derivation_inflections (derivation_id, content)
 			VALUES (?, ?)
@@ -482,7 +482,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer inflStmt.Close()
-		
+
 		for _, derivation := range baseLang.Derivations {
 			derivationResult, err := derivationStmt.Exec(
 				baseLangID,
@@ -493,13 +493,13 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			if err != nil {
 				return err
 			}
-			
+
 			if derivation.Inflection != "" {
 				derivationID, err := derivationResult.LastInsertId()
 				if err != nil {
 					return err
 				}
-				
+
 				_, err = inflStmt.Exec(
 					derivationID,
 					derivation.Inflection,
@@ -510,7 +510,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	// Store indexes
 	if len(baseLang.Indexes) > 0 {
 		indexStmt, err := tx.Prepare(`
@@ -521,7 +521,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			return err
 		}
 		defer indexStmt.Close()
-		
+
 		for _, index := range baseLang.Indexes {
 			_, err = indexStmt.Exec(
 				baseLangID,
@@ -533,7 +533,7 @@ func storeBaseLang(tx *sql.Tx, wordID int64, baseLang parser.BaseLang) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -548,7 +548,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 		return err
 	}
 	defer targetLangStmt.Close()
-	
+
 	targetLangResult, err := targetLangStmt.Exec(
 		wordID,
 		nullString(targetLang.Comment),
@@ -556,12 +556,12 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 	if err != nil {
 		return err
 	}
-	
+
 	targetLangID, err := targetLangResult.LastInsertId()
 	if err != nil {
 		return err
 	}
-	
+
 	// Store translation
 	if targetLang.Translation != "" {
 		_, err = tx.Exec(`
@@ -575,7 +575,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 	}
-	
+
 	// Store synonym
 	if targetLang.Synonym != "" {
 		_, err = tx.Exec(`
@@ -589,7 +589,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 	}
-	
+
 	// Store comment
 	if targetLang.CommentElem != "" {
 		_, err = tx.Exec(`
@@ -603,7 +603,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 	}
-	
+
 	// Store explanation
 	if targetLang.Explanation != "" {
 		_, err = tx.Exec(`
@@ -617,7 +617,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 	}
-	
+
 	// Store antonyms
 	if len(targetLang.Antonyms) > 0 {
 		antStmt, err := tx.Prepare(`
@@ -628,7 +628,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 		defer antStmt.Close()
-		
+
 		for _, ant := range targetLang.Antonyms {
 			_, err = antStmt.Exec(
 				targetLangID,
@@ -639,7 +639,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			}
 		}
 	}
-	
+
 	// Store examples
 	if len(targetLang.Examples) > 0 {
 		exampleStmt, err := tx.Prepare(`
@@ -650,7 +650,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 		defer exampleStmt.Close()
-		
+
 		for _, example := range targetLang.Examples {
 			_, err = exampleStmt.Exec(
 				targetLangID,
@@ -663,7 +663,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			}
 		}
 	}
-	
+
 	// Store idioms
 	if len(targetLang.Idioms) > 0 {
 		idiomStmt, err := tx.Prepare(`
@@ -674,7 +674,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 		defer idiomStmt.Close()
-		
+
 		for _, idiom := range targetLang.Idioms {
 			_, err = idiomStmt.Exec(
 				targetLangID,
@@ -687,7 +687,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			}
 		}
 	}
-	
+
 	// Store compounds
 	if len(targetLang.Compounds) > 0 {
 		compoundStmt, err := tx.Prepare(`
@@ -698,7 +698,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 		defer compoundStmt.Close()
-		
+
 		inflStmt, err := tx.Prepare(`
 			INSERT INTO compound_inflections (compound_id, content)
 			VALUES (?, ?)
@@ -707,7 +707,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 		defer inflStmt.Close()
-		
+
 		for _, compound := range targetLang.Compounds {
 			compoundResult, err := compoundStmt.Exec(
 				targetLangID,
@@ -719,13 +719,13 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			if err != nil {
 				return err
 			}
-			
+
 			if compound.Inflection != "" {
 				compoundID, err := compoundResult.LastInsertId()
 				if err != nil {
 					return err
 				}
-				
+
 				_, err = inflStmt.Exec(
 					compoundID,
 					compound.Inflection,
@@ -736,7 +736,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			}
 		}
 	}
-	
+
 	// Store derivations
 	if len(targetLang.Derivations) > 0 {
 		derivationStmt, err := tx.Prepare(`
@@ -747,7 +747,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 		defer derivationStmt.Close()
-		
+
 		inflStmt, err := tx.Prepare(`
 			INSERT INTO derivation_inflections (derivation_id, content)
 			VALUES (?, ?)
@@ -756,7 +756,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			return err
 		}
 		defer inflStmt.Close()
-		
+
 		for _, derivation := range targetLang.Derivations {
 			derivationResult, err := derivationStmt.Exec(
 				targetLangID,
@@ -767,13 +767,13 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			if err != nil {
 				return err
 			}
-			
+
 			if derivation.Inflection != "" {
 				derivationID, err := derivationResult.LastInsertId()
 				if err != nil {
 					return err
 				}
-				
+
 				_, err = inflStmt.Exec(
 					derivationID,
 					derivation.Inflection,
@@ -784,7 +784,7 @@ func storeTargetLang(tx *sql.Tx, wordID int64, targetLang parser.TargetLang) err
 			}
 		}
 	}
-	
+
 	return nil
 }
 

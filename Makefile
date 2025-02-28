@@ -4,12 +4,17 @@ VERSION := 0.1.0
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 
-.PHONY: all build clean run test
+.PHONY: all build clean run test deps
 
 all: build
 
+# Install dependencies
+deps:
+	go get modernc.org/sqlite
+	go mod tidy
+
 # Build the application
-build:
+build: deps
 	mkdir -p bin
 	go build $(LDFLAGS) -o bin/$(APP_NAME) ./cmd/lexin
 
